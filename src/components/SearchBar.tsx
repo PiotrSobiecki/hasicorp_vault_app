@@ -1,5 +1,7 @@
 "use client";
 
+import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+
 interface SearchBarProps {
   value: string;
   onChange: (value: string) => void;
@@ -7,12 +9,15 @@ interface SearchBarProps {
 
 export default function SearchBar({ value, onChange }: SearchBarProps) {
   return (
-    <input
-      type="text"
-      placeholder="Szukaj wpisów..."
-      className="form-input w-full h-10 px-4 bg-[var(--bg-tertiary)] border border-[var(--border-color)] focus:border-[var(--accent-primary)] transition-colors"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-    />
+    <div className="pm-search-wrap">
+      <MagnifyingGlassIcon className="pm-search-icon" style={{ width: 15, height: 15 }} />
+      <input
+        type="text"
+        placeholder="Szukaj wpisów..."
+        className="pm-search"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import PasswordForm from "@/components/PasswordForm";
 import PasswordList from "@/components/PasswordList";
@@ -10,6 +11,7 @@ export default function Home() {
   const [isFormVisible, setIsFormVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const router = useRouter();
 
   const handlePasswordAdded = () => {
     setIsFormVisible(false);
@@ -17,40 +19,63 @@ export default function Home() {
   };
 
   return (
-    <div className="password-container">
-      <div className="mb-6">
-        <h1 className="section-title mb-4">Menedżer Haseł</h1>
-        <SearchBar value={searchQuery} onChange={setSearchQuery} />
-      </div>
-
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="section-title mb-0"></h1>
-        <button
-          onClick={() => setIsFormVisible(!isFormVisible)}
-          className="button button-primary px-6 h-10 whitespace-nowrap"
-        >
-          <PlusIcon className="h-5 w-5" />
-          <span>Nowy wpis</span>
-        </button>
-      </div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="section-title mb-0"></h1>
-      </div>
-      {isFormVisible && (
-        <div className="password-item mb-6 animate-slideDown">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="section-title mb-0">Nowe dane logowania</h2>
+    <div className="pm-app">
+      {/* ── Header ─────────────────────────────────────────── */}
+      <header className="pm-header">
+        <div className="pm-logo">
+          <div className="pm-logo-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
           </div>
-          <PasswordForm onSuccess={handlePasswordAdded} />
+          <div>
+            <div className="pm-logo-title">Vault Manager</div>
+            <div className="pm-logo-subtitle">HashiCorp Vault</div>
+          </div>
         </div>
-      )}
+        <button
+          onClick={async () => {
+            await fetch("/api/logout", { method: "POST" });
+            router.push("/login");
+          }}
+          className="pm-logout-btn"
+          title="Zablokuj sejf"
+        >
+          ⏻
+        </button>
+      </header>
 
-      <PasswordList
-        searchQuery={searchQuery}
-        selectedId={null}
-        onPasswordSelect={() => {}}
-        key={refreshTrigger}
-      />
+      {/* ── Main card ──────────────────────────────────────── */}
+      <div className="pm-card">
+        {/* Toolbar: search + new */}
+        <div className="pm-toolbar">
+          <SearchBar value={searchQuery} onChange={setSearchQuery} />
+          <button
+            onClick={() => setIsFormVisible(!isFormVisible)}
+            className="pm-btn-primary"
+          >
+            <PlusIcon style={{ width: 15, height: 15 }} />
+            Nowy wpis
+          </button>
+        </div>
+
+        {/* New-entry form */}
+        {isFormVisible && (
+          <PasswordForm
+            onSuccess={handlePasswordAdded}
+            onCancel={() => setIsFormVisible(false)}
+          />
+        )}
+
+        {/* List */}
+        <PasswordList
+          searchQuery={searchQuery}
+          selectedId={null}
+          onPasswordSelect={() => {}}
+          key={refreshTrigger}
+        />
+      </div>
     </div>
   );
 }
