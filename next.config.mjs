@@ -1,35 +1,50 @@
 /** @type {import("next").NextConfig} */
 
+const isDev = process.env.NODE_ENV !== "production";
+
 const securityHeaders = [
-  // Zakaz osadzania w iframe (ochrona przed clickjackingiem)
+  // Prevent embedding in iframes (clickjacking protection)
   { key: "X-Frame-Options", value: "DENY" },
-  // Wymuszenie HTTPS przez rok (HSTS)
+  // Enforce HTTPS for one year (HSTS)
   { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains; preload" },
-  // Nie wykrywaj automatycznie typów MIME
+  // Do not auto-detect MIME types
   { key: "X-Content-Type-Options", value: "nosniff" },
-  // Polityka referrer – nie wyciekaj URL do zewnętrznych serwisów
+  // Do not leak URL to external services
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  // Ogranicz dostęp do API przeglądarki
+  // Browser API permissions
+  // camera=(self) — required for QR code scanner in the entry form
   {
     key: "Permissions-Policy",
-    value: "camera=(), microphone=(), geolocation=(), payment=()",
+    value: "camera=(self), microphone=(), geolocation=(), payment=()",
   },
   // Content Security Policy
-  // – skrypty: tylko własna domena + Google Fonts
-  // – style: własna domena + Google Fonts (unsafe-inline wymagane przez Chakra UI)
-  // – img: własna domena + Google favicon API (favikony serwisów)
-  // – connect: własna domena (API calls)
   {
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // unsafe-eval wymagane przez Next.js dev
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: https://www.google.com https://*.gstatic.com", // Google favicon API (może redirectować na gstatic.com)
+      // unsafe-inline required by Next.js / Chakra UI
+      // unsafe-eval only in dev (Next.js hot reload); removed in production
+      isDev
+        ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+        : "script-src 'self' 'unsafe-inline'",
+      // unsafe-inline required by Chakra UI inline styles
+      "style-src 'self' 'unsafe-inline'",
+      // font-src: self only (no Google Fonts used)
+      "font-src 'self'",
+      // img-src: self + data: (inline QR code / base64 images)
+      // No Google domains — favicons are proxied through /api/favicon
+      "img-src 'self' data: blob:",
+      // connect-src: self (all API calls go to own server)
       "connect-src 'self'",
+      // media-src: self (getUserMedia / camera stream for QR scanner)
+      "media-src 'self'",
+      // worker-src: self blob: (Next.js service worker)
+      "worker-src 'self' blob:",
+      // Prevent any frame embedding
       "frame-ancestors 'none'",
+      // Restrict base tag
       "base-uri 'self'",
+      // Restrict form submissions
       "form-action 'self'",
     ].join("; "),
   },
@@ -43,16 +58,6 @@ const nextConfig = {
         headers: securityHeaders,
       },
     ];
-  },
-  // Zezwól na favicon z Google (zewnętrzne domeny w img)
-  images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "www.google.com",
-        pathname: "/s2/favicons/**",
-      },
-    ],
   },
 };
 

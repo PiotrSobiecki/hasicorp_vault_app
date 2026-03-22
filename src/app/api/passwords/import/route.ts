@@ -17,6 +17,13 @@ export async function POST(request: Request) {
       );
     }
 
+    if (passwords.length > 10_000) {
+      return NextResponse.json(
+        { error: "Zbyt wiele wpisów w pliku importu (maksimum 10 000)." },
+        { status: 413 },
+      );
+    }
+
     // 1. Zapisz stare ID przed operacją (atomowość: najpierw dodaj nowe, potem usuń stare)
     const existing = await listVaultPasswords();
     const oldIds = existing.map((p) => p.id);

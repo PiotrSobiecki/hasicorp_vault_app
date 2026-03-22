@@ -1,31 +1,72 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { KeyIcon, ShieldCheckIcon, EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
+
+const SK_STORAGE_KEY = "pm_secret_key";
+
+interface LoginConfig {
+  totpRequired: boolean;
+  secretKeyRequired: boolean;
+}
 
 export default function LoginPage() {
+  const [config, setConfig] = useState<LoginConfig>({ totpRequired: false, secretKeyRequired: false });
   const [password, setPassword] = useState("");
+  const [secretKey, setSecretKey] = useState("");
+  const [totpCode, setTotpCode] = useState("");
+  const [rememberDevice, setRememberDevice] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
+  const [skStored, setSkStored] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const from = searchParams.get("from") || "/";
+  const rawFrom = searchParams.get("from") || "/";
+  const from = rawFrom.startsWith("/") && !rawFrom.includes("://") ? rawFrom : "/";
+
+  // Fetch login config (which factors are required)
+  useEffect(() => {
+    fetch("/api/login-config")
+      .then((r) => r.json())
+      .then((data: LoginConfig) => {
+        setConfig(data);
+        // Load stored Secret Key for trusted devices
+        if (data.secretKeyRequired) {
+          const stored = localStorage.getItem(SK_STORAGE_KEY);
+          if (stored) { setSecretKey(stored); setSkStored(true); }
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
     try {
+      const body: Record<string, string> = { password };
+      if (config.secretKeyRequired && secretKey) body.secretKey = secretKey;
+      if (config.totpRequired && totpCode) body.totpCode = totpCode;
+
       const res = await fetch("/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Nieprawidłowe hasło.");
+      if (!res.ok) throw new Error(data.error || "Nieprawidłowe dane logowania.");
+
+      if (config.secretKeyRequired && secretKey && rememberDevice) {
+        localStorage.setItem(SK_STORAGE_KEY, secretKey);
+      } else if (config.secretKeyRequired && !rememberDevice) {
+        localStorage.removeItem(SK_STORAGE_KEY);
+      }
+
       router.push(from || "/");
-    } catch (err: any) {
-      setError(err.message || "Błąd logowania.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Błąd logowania.");
     } finally {
       setLoading(false);
     }
@@ -48,22 +89,99 @@ export default function LoginPage() {
       {/* Card */}
       <div className="pm-login-card">
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+          {/* Master password */}
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             <label className="pm-form-label">Hasło główne</label>
-            <input
-              type="password"
-              className="pm-form-input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Wpisz hasło główne…"
-              required
-              autoFocus
-            />
+            <div style={{ position: "relative" }}>
+              <input
+                type={showPassword ? "text" : "password"}
+                className="pm-form-input"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Wpisz hasło główne…"
+                required
+                autoFocus
+                style={{ paddingRight: 36, width: "100%" }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: 0, display: "flex" }}
+              >
+                {showPassword
+                  ? <EyeSlashIcon style={{ width: 16, height: 16 }} />
+                  : <EyeIcon style={{ width: 16, height: 16 }} />}
+              </button>
+            </div>
           </div>
+
+          {/* Secret Key */}
+          {config.secretKeyRequired && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label className="pm-form-label" style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <KeyIcon style={{ width: 12, height: 12 }} />
+                Secret Key
+              </label>
+              {skStored ? (
+                <div className="pm-sk-stored">
+                  <ShieldCheckIcon style={{ width: 14, height: 14, color: "var(--success)", flexShrink: 0 }} />
+                  <span>Urządzenie zaufane — Secret Key zapamiętany</span>
+                  <button type="button" className="pm-sk-forget" onClick={() => {
+                    localStorage.removeItem(SK_STORAGE_KEY);
+                    setSecretKey(""); setSkStored(false);
+                  }}>Zapomnij</button>
+                </div>
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    className="pm-form-input"
+                    value={secretKey}
+                    onChange={(e) => setSecretKey(e.target.value.toUpperCase().replace(/[^A-Z2-7-]/g, ""))}
+                    placeholder="SK-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX"
+                    required
+                    spellCheck={false}
+                    autoComplete="off"
+                    style={{ fontFamily: "monospace", letterSpacing: "0.05em" }}
+                  />
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12, color: "var(--text-muted)" }}>
+                    <input type="checkbox" checked={rememberDevice} onChange={(e) => setRememberDevice(e.target.checked)}
+                      style={{ accentColor: "var(--accent)", width: 13, height: 13 }} />
+                    Zapamiętaj na tym urządzeniu
+                  </label>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* TOTP */}
+          {config.totpRequired && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <label className="pm-form-label" style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                </svg>
+                Kod 2FA
+              </label>
+              <input
+                type="text"
+                inputMode="numeric"
+                className="pm-form-input"
+                value={totpCode}
+                onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="000000"
+                required
+                autoComplete="one-time-code"
+                style={{ fontFamily: "monospace", fontSize: 20, letterSpacing: "0.25em", textAlign: "center" }}
+              />
+            </div>
+          )}
 
           {error && <div className="pm-login-error">{error}</div>}
 
-          <button type="submit" disabled={loading} className="pm-btn-primary" style={{ width: "100%", justifyContent: "center", padding: "12px 16px", fontSize: 14 }}>
+          <button type="submit" disabled={loading} className="pm-btn-primary"
+            style={{ width: "100%", justifyContent: "center", padding: "12px 16px", fontSize: 14 }}>
             {loading ? (
               <>
                 <span style={{ display: "inline-block", width: 14, height: 14, border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "white", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
@@ -72,8 +190,7 @@ export default function LoginPage() {
             ) : (
               <>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="11" width="18" height="11" rx="2"/>
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                  <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                 </svg>
                 Odblokuj sejf
               </>
@@ -83,8 +200,8 @@ export default function LoginPage() {
       </div>
 
       <p className="pm-login-hint" style={{ marginTop: 20 }}>
-        Hasło jest weryfikowane wyłącznie po stronie serwera i nie jest zapamiętywane.<br />
-        Dane trzymane są w <strong style={{ color: "var(--text-secondary)" }}>HashiCorp Vault</strong>.
+        Hasło weryfikowane wyłącznie po stronie serwera.<br />
+        Dane w <strong style={{ color: "var(--text-secondary)" }}>HashiCorp Vault</strong>.
       </p>
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>

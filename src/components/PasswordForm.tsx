@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { useToast } from "@chakra-ui/react";
-import { EyeIcon, EyeSlashIcon, ClipboardIcon, SparklesIcon } from "@heroicons/react/24/outline";
+import { EyeIcon, EyeSlashIcon, SparklesIcon, QrCodeIcon } from "@heroicons/react/24/outline";
 import { Password } from "@/types/password";
+import QrScanner from "./QrScanner";
+import CopyButton from "./CopyButton";
 
 interface PasswordFormProps {
   initialData?: Password;
@@ -26,18 +28,26 @@ export default function PasswordForm({ initialData, onSuccess, onCancel }: Passw
 
   const [showPassword, setShowPassword] = useState(false);
   const [showKey, setShowKey] = useState(false);
+  const [showQrScanner, setShowQrScanner] = useState(false);
 
   const set = (field: string, value: string | number) =>
     setFormData((prev) => ({ ...prev, [field]: value }));
 
   const generatePassword = () => {
     const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
-    const randomValues = new Uint32Array(formData.passwordLength);
-    crypto.getRandomValues(randomValues);
-    const pw = Array.from(randomValues)
-      .map((v) => charset[v % charset.length])
-      .join("");
-    set("password", pw);
+    // Rejection sampling eliminates modulo bias (2^32 is not divisible by charset.length)
+    const max = Math.floor(0x1_0000_0000 / charset.length) * charset.length;
+    const result: string[] = [];
+    while (result.length < formData.passwordLength) {
+      const buf = new Uint32Array(formData.passwordLength - result.length);
+      crypto.getRandomValues(buf);
+      for (const v of buf) {
+        if (v < max && result.length < formData.passwordLength) {
+          result.push(charset[v % charset.length]);
+        }
+      }
+    }
+    set("password", result.join(""));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -46,7 +56,7 @@ export default function PasswordForm({ initialData, onSuccess, onCancel }: Passw
       const url    = initialData ? `/api/passwords/${initialData.id}` : "/api/passwords";
       const method = initialData ? "PUT" : "POST";
       // Nie wysyłaj pola UI (passwordLength) do API
-      const { passwordLength: _ignored, ...payload } = formData;
+      const { passwordLength: _pl, ...payload } = formData;
       const res    = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
@@ -61,7 +71,6 @@ export default function PasswordForm({ initialData, onSuccess, onCancel }: Passw
     }
   };
 
-  const copy = (text: string) => navigator.clipboard.writeText(text);
 
   return (
     <form onSubmit={handleSubmit} className="pm-form">
@@ -117,20 +126,33 @@ export default function PasswordForm({ initialData, onSuccess, onCancel }: Passw
           <button type="button" className="pm-icon-btn" onClick={() => setShowKey(!showKey)}>
             {showKey ? <EyeSlashIcon style={{ width: 16, height: 16 }} /> : <EyeIcon style={{ width: 16, height: 16 }} />}
           </button>
-          <button type="button" className="pm-icon-btn" onClick={() => copy(formData.key)} title="Kopiuj">
-            <ClipboardIcon style={{ width: 16, height: 16 }} />
-          </button>
+          <CopyButton variant="icon" text={formData.key} iconSize={16} title="Kopiuj klucz" />
         </div>
       </div>
 
       {/* 2FA */}
       <div className="pm-form-group">
         <label className="pm-form-label">Seed 2FA <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>(opcjonalnie)</span></label>
-        <input className="pm-form-input" type="text"
-          placeholder="CBY5447MAGBR9Y37"
-          value={formData.twoFactorCode}
-          onChange={(e) => set("twoFactorCode", e.target.value.replace(/\s+/g, ""))} />
+        <div className="pm-form-row">
+          <input className="pm-form-input" type="text"
+            placeholder="CBY5447MAGBR9Y37"
+            value={formData.twoFactorCode}
+            onChange={(e) => set("twoFactorCode", e.target.value.replace(/\s+/g, ""))} />
+          <button type="button" className="pm-icon-btn" title="Skanuj kod QR" onClick={() => setShowQrScanner(true)}>
+            <QrCodeIcon style={{ width: 16, height: 16 }} />
+          </button>
+        </div>
       </div>
+
+      {showQrScanner && (
+        <QrScanner
+          onScan={(secret) => {
+            set("twoFactorCode", secret);
+            setShowQrScanner(false);
+          }}
+          onClose={() => setShowQrScanner(false)}
+        />
+      )}
 
       {/* URL */}
       <div className="pm-form-group">

@@ -379,6 +379,33 @@ body {
   border-color: rgba(255,255,255,0.2);
 }
 
+/* ── Danger button (Wyłącz / Usuń) ────────────────────────── */
+.pm-btn-danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  background: rgba(220, 50, 50, 0.12);
+  color: var(--danger);
+  border: 1px solid rgba(220, 50, 50, 0.3);
+  border-radius: var(--r-sm);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.pm-btn-danger:hover {
+  background: rgba(220, 50, 50, 0.22);
+  border-color: rgba(220, 50, 50, 0.5);
+}
+
+.pm-btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* ── Ghost button (Anuluj in form) ─────────────────────────── */
 .pm-btn-ghost {
   display: inline-flex;
@@ -650,6 +677,112 @@ textarea.pm-form-input {
   text-align: center;
   line-height: 1.6;
 }
+
+/* ── QR Scanner overlay ────────────────────────────────────── */
+.pm-qr-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.pm-qr-modal {
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-lg);
+  width: min(400px, 94vw);
+  overflow: hidden;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.8);
+}
+
+.pm-qr-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.pm-qr-viewport {
+  position: relative;
+  aspect-ratio: 4/3;
+  background: #000;
+  overflow: hidden;
+}
+
+.pm-qr-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--danger);
+  font-size: 13px;
+  padding: 20px;
+  text-align: center;
+}
+
+/* Animated corner frame */
+.pm-qr-frame {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.pm-qr-corner {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border-color: var(--accent);
+  border-style: solid;
+}
+
+.pm-qr-corner.tl { top: 20px; left: 20px; border-width: 3px 0 0 3px; }
+.pm-qr-corner.tr { top: 20px; right: 20px; border-width: 3px 3px 0 0; }
+.pm-qr-corner.bl { bottom: 20px; left: 20px; border-width: 0 0 3px 3px; }
+.pm-qr-corner.br { bottom: 20px; right: 20px; border-width: 0 3px 3px 0; }
+
+/* ── Audit log row ──────────────────────────────────────────── */
+.pm-audit-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--bg-item);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font-size: 12px;
+}
+
+/* ── Secret Key stored indicator ───────────────────────────── */
+.pm-sk-stored {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  background: rgba(62, 207, 142, 0.08);
+  border: 1px solid rgba(62, 207, 142, 0.25);
+  border-radius: var(--r-sm);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.pm-sk-forget {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: color 0.15s;
+}
+
+.pm-sk-forget:hover { color: var(--danger); }
 
 /* ── Input clear button suppression ────────────────────────── */
 input::-ms-clear,

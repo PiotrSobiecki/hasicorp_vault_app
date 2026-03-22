@@ -9,7 +9,7 @@ export async function POST(request: Request) {
       process.env.ENCRYPTION_KEY!
     );
     return NextResponse.json({ encryptedData });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Wystąpił błąd podczas szyfrowania" },
       { status: 500 }

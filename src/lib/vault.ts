@@ -1,5 +1,13 @@
 import { Password } from "@/types/password";
 
+/** Minimal shape of a Vault KV v2 data response */
+interface VaultKVResponse {
+  data?: {
+    data?: Record<string, string>;
+    keys?: string[];
+  };
+}
+
 const VAULT_ADDR = process.env.VAULT_ADDR!;
 const VAULT_TOKEN = process.env.VAULT_TOKEN!;
 const VAULT_MOUNT_NAME =
@@ -32,18 +40,17 @@ async function vaultRequest<T>(
     headers: {
       "X-Vault-Token": VAULT_TOKEN,
       "Content-Type": "application/json",
-      ...(opts.headers || {}),
+      ...(opts.headers ?? {}),
     },
   });
 
   if (!res.ok) {
-    // 404 dla listy traktujemy wyżej, tutaj rzucamy błąd
     const text = await res.text().catch(() => "");
     throw new Error(`Vault API error ${res.status}: ${text}`);
   }
 
-  if ((opts as any).raw) {
-    return res as any as T;
+  if (opts.raw) {
+    return res as unknown as T;
   }
 
   // 204 No Content (np. DELETE metadata) – brak body, zwracamy pusty obiekt
@@ -56,14 +63,14 @@ async function vaultRequest<T>(
 
 async function listIds(): Promise<string[]> {
   try {
-    const json = await vaultRequest<any>(
+    const json = await vaultRequest<VaultKVResponse>(
       `${VAULT_MOUNT_NAME}/metadata/${VAULT_PASSWORDS_PATH}`,
       { method: "LIST" },
     );
-    const keys: string[] = json.data?.keys || [];
+    const keys: string[] = json.data?.keys ?? [];
     // keys z Vault mogą mieć końcowy "/"
     return keys.map((k) => k.replace(/\/$/, ""));
-  } catch (e: any) {
+  } catch (e) {
     // Jeśli nic nie ma pod tym path – Vault zwraca 404, traktujemy jako pustą listę
     if (e instanceof Error && /404/.test(e.message)) {
       return [];
@@ -78,20 +85,20 @@ export async function listVaultPasswords(): Promise<Password[]> {
 
   for (const id of ids) {
     try {
-      const json = await vaultRequest<any>(
+      const json = await vaultRequest<VaultKVResponse>(
         `${VAULT_MOUNT_NAME}/data/${dataPath(id)}`,
         { method: "GET" },
       );
-      const d = json.data?.data || {};
+      const d = json.data?.data ?? {};
       result.push({
         id,
-        title: d.title || "",
-        username: d.username || "",
-        password: d.password || "",
-        key: d.key || undefined,
-        url: d.url || undefined,
-        notes: d.notes || undefined,
-        twoFactorCode: d.twoFactorCode || undefined,
+        title: d.title ?? "",
+        username: d.username ?? "",
+        password: d.password ?? "",
+        key: d.key ?? undefined,
+        url: d.url ?? undefined,
+        notes: d.notes ?? undefined,
+        twoFactorCode: d.twoFactorCode ?? undefined,
       });
     } catch {
       // Pomijamy wpisy, których nie da się odczytać
@@ -123,22 +130,22 @@ export async function createVaultPassword(
 
 export async function getVaultPassword(id: string): Promise<Password | null> {
   try {
-    const json = await vaultRequest<any>(
+    const json = await vaultRequest<VaultKVResponse>(
       `${VAULT_MOUNT_NAME}/data/${dataPath(id)}`,
       { method: "GET" },
     );
-    const d = json.data?.data || {};
+    const d = json.data?.data ?? {};
     return {
       id,
-      title: d.title || "",
-      username: d.username || "",
-      password: d.password || "",
-      key: d.key || undefined,
-      url: d.url || undefined,
-      notes: d.notes || undefined,
-      twoFactorCode: d.twoFactorCode || undefined,
+      title: d.title ?? "",
+      username: d.username ?? "",
+      password: d.password ?? "",
+      key: d.key ?? undefined,
+      url: d.url ?? undefined,
+      notes: d.notes ?? undefined,
+      twoFactorCode: d.twoFactorCode ?? undefined,
     };
-  } catch (e: any) {
+  } catch (e) {
     if (e instanceof Error && /404/.test(e.message)) {
       return null;
     }
@@ -167,5 +174,53 @@ export async function deleteVaultPassword(id: string): Promise<void> {
   // Usuwamy metadane (wszystkie wersje) – twarde usunięcie
   await vaultRequest(`${VAULT_MOUNT_NAME}/metadata/${dataPath(id)}`, {
     method: "DELETE",
+  });
+}
+
+// ── App config (TOTP etc.) stored at a fixed Vault path ──────
+
+const APP_CONFIG_PATH = "app/config";
+
+export interface AppConfig {
+  totpSecret?: string;
+  totpEnabled?: boolean;
+  secretKeyEnabled?: boolean;
+  /** HMAC-SHA256(secretKey, NEXTAUTH_SECRET) — never store the key itself */
+  secretKeyHash?: string;
+}
+
+export async function getAppConfig(): Promise<AppConfig> {
+  try {
+    const json = await vaultRequest<VaultKVResponse>(
+      `${VAULT_MOUNT_NAME}/data/${APP_CONFIG_PATH}`,
+      { method: "GET" },
+    );
+    const d = json.data?.data ?? {};
+    return {
+      totpSecret: d.totpSecret ?? undefined,
+      totpEnabled: d.totpEnabled === "true",
+      secretKeyEnabled: d.secretKeyEnabled === "true",
+      secretKeyHash: d.secretKeyHash ?? undefined,
+    };
+  } catch (e) {
+    if (e instanceof Error && /404/.test(e.message)) return {};
+    throw e;
+  }
+}
+
+export async function saveAppConfig(config: AppConfig): Promise<void> {
+  // Merge with existing config to avoid overwriting unrelated fields
+  const current = await getAppConfig();
+  const merged = { ...current, ...config };
+  await vaultRequest(`${VAULT_MOUNT_NAME}/data/${APP_CONFIG_PATH}`, {
+    method: "POST",
+    body: JSON.stringify({
+      data: {
+        totpSecret: merged.totpSecret ?? "",
+        totpEnabled: String(merged.totpEnabled ?? false),
+        secretKeyEnabled: String(merged.secretKeyEnabled ?? false),
+        secretKeyHash: merged.secretKeyHash ?? "",
+      },
+    }),
   });
 }

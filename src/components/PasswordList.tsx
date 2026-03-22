@@ -18,40 +18,47 @@ import {
   EyeSlashIcon,
   TrashIcon,
   PencilIcon,
-  ClipboardIcon,
   ChevronDownIcon,
   ArrowDownTrayIcon,
   ArrowUpTrayIcon,
 } from "@heroicons/react/24/outline";
 import PasswordForm from "./PasswordForm";
+import CopyButton from "./CopyButton";
 
 // ── Favicon avatar ───────────────────────────────────────────
-// Cache wyników poza komponentem – persystuje między renderami w sesji
+// Favicons are fetched via /api/favicon (server-side proxy) so the user's
+// browser never contacts Google directly.
 const faviconFailCache = new Set<string>();
 
 function ItemAvatar({ title, url }: { title: string; url?: string }) {
-  const src = (() => {
+  const domain = (() => {
     if (!url) return null;
     try {
-      const domain = new URL(url).hostname;
-      if (faviconFailCache.has(domain)) return null;
-      return `https://www.google.com/s2/favicons?domain=${domain}&sz=48`;
+      const h = new URL(url).hostname;
+      return faviconFailCache.has(h) ? null : h;
     } catch {
       return null;
     }
   })();
 
+  const src = domain ? `/api/favicon?domain=${encodeURIComponent(domain)}` : null;
   const [loaded, setLoaded] = useState<"pending" | "ok" | "fail">(
     src ? "pending" : "fail",
   );
-
   const initials = title.trim().slice(0, 2).toUpperCase() || "?";
 
   if (src && loaded !== "fail") {
     return (
-      <div className="pm-item-avatar" style={{ background: "#1a2035", padding: loaded === "ok" ? 6 : undefined, position: "relative" }}>
-        {/* Inicjały widoczne dopóki favicon się ładuje */}
-        {loaded === "pending" && <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{initials}</span>}
+      <div
+        className="pm-item-avatar"
+        style={{ background: "#1a2035", padding: loaded === "ok" ? 6 : undefined, position: "relative" }}
+      >
+        {loaded === "pending" && (
+          <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            {initials}
+          </span>
+        )}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={src}
           alt=""
@@ -60,7 +67,7 @@ function ItemAvatar({ title, url }: { title: string; url?: string }) {
           style={{ borderRadius: 4, display: loaded === "ok" ? "block" : "none" }}
           onLoad={() => setLoaded("ok")}
           onError={() => {
-            try { faviconFailCache.add(new URL(url!).hostname); } catch {}
+            if (domain) faviconFailCache.add(domain);
             setLoaded("fail");
           }}
         />
@@ -79,8 +86,8 @@ interface PasswordListProps {
 
 export default function PasswordList({
   searchQuery,
-  selectedId,
-  onPasswordSelect,
+  selectedId: _selectedId,
+  onPasswordSelect: _onPasswordSelect,
 }: PasswordListProps) {
   const toast = useToast();
   const [passwords, setPasswords] = useState<Password[]>([]);
@@ -141,14 +148,6 @@ export default function PasswordList({
     }
   };
 
-  const copy = async (text: string, label = "Skopiowano") => {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast({ title: label, status: "success", duration: 1800, isClosable: true });
-    } catch {
-      toast({ title: "Błąd kopiowania", status: "error", duration: 2000, isClosable: true });
-    }
-  };
 
   const handleSaveEdit = async (updated: Password) => {
     try {
@@ -203,7 +202,7 @@ export default function PasswordList({
         const text = await file.text();
 
         // Spróbuj jako plain JSON; jeśli nie – odszyfruj server-side (klucz nie jest wystawiany klientowi)
-        let importedData: any;
+        let importedData: { passwords: unknown[] };
         try {
           importedData = JSON.parse(text);
         } catch {
@@ -307,9 +306,7 @@ export default function PasswordList({
                       <div className="pm-field-label">Nazwa użytkownika</div>
                       <div className="pm-field-row">
                         <input type="text" readOnly value={p.username} className="pm-field-input" />
-                        <button className="pm-icon-btn" onClick={() => copy(p.username, "Skopiowano login")} title="Kopiuj">
-                          <ClipboardIcon style={{ width: 16, height: 16 }} />
-                        </button>
+                        <CopyButton variant="icon" text={p.username} iconSize={16} title="Kopiuj login" />
                       </div>
                     </div>
 
@@ -327,9 +324,7 @@ export default function PasswordList({
                             ? <EyeSlashIcon style={{ width: 16, height: 16 }} />
                             : <EyeIcon style={{ width: 16, height: 16 }} />}
                         </button>
-                        <button className="pm-icon-btn" onClick={() => copy(p.password, "Skopiowano hasło")} title="Kopiuj">
-                          <ClipboardIcon style={{ width: 16, height: 16 }} />
-                        </button>
+                        <CopyButton variant="icon" text={p.password} iconSize={16} title="Kopiuj hasło" />
                       </div>
                     </div>
 
@@ -341,9 +336,7 @@ export default function PasswordList({
                           <a href={p.url} target="_blank" rel="noopener noreferrer" className="pm-field-input" style={{ color: "#5a9fff", textDecoration: "none", display: "flex", alignItems: "center" }}>
                             {p.url}
                           </a>
-                          <button className="pm-icon-btn" onClick={() => copy(p.url!, "Skopiowano URL")} title="Kopiuj">
-                            <ClipboardIcon style={{ width: 16, height: 16 }} />
-                          </button>
+                          <CopyButton variant="icon" text={p.url!} iconSize={16} title="Kopiuj URL" />
                         </div>
                       </div>
                     )}
@@ -354,9 +347,7 @@ export default function PasswordList({
                         <div className="pm-field-label">Kod 2FA</div>
                         <div className="pm-field-row">
                           <code className="pm-totp-code">{totpCodes[p.id] || "------"}</code>
-                          <button className="pm-icon-btn" onClick={() => copy(totpCodes[p.id] || "", "Skopiowano kod 2FA")} title="Kopiuj">
-                            <ClipboardIcon style={{ width: 16, height: 16 }} />
-                          </button>
+                          <CopyButton variant="icon" text={(totpCodes[p.id] || "").split(" ")[0]} iconSize={16} title="Kopiuj kod 2FA" />
                         </div>
                       </div>
                     )}
@@ -376,9 +367,7 @@ export default function PasswordList({
                               ? <EyeSlashIcon style={{ width: 16, height: 16 }} />
                               : <EyeIcon style={{ width: 16, height: 16 }} />}
                           </button>
-                          <button className="pm-icon-btn" onClick={() => copy(p.key!, "Skopiowano klucz")} title="Kopiuj">
-                            <ClipboardIcon style={{ width: 16, height: 16 }} />
-                          </button>
+                          <CopyButton variant="icon" text={p.key!} iconSize={16} title="Kopiuj klucz" />
                         </div>
                       </div>
                     )}

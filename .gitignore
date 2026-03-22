@@ -43,3 +43,9 @@ start-hidden.vbs
 start-app.bat
 start.bat
 tofix.md
+.env_backup
+.env
+.env.local
+
+# Claude Code local settings
+.claude/

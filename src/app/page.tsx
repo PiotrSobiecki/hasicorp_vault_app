@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import PasswordForm from "@/components/PasswordForm";
 import PasswordList from "@/components/PasswordList";
-import { PlusIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, Cog6ToothIcon } from "@heroicons/react/24/outline";
+import Link from "next/link";
 import SearchBar from "@/components/SearchBar";
 
 export default function Home() {
@@ -34,16 +35,21 @@ export default function Home() {
             <div className="pm-logo-subtitle">HashiCorp Vault</div>
           </div>
         </div>
-        <button
-          onClick={async () => {
-            await fetch("/api/logout", { method: "POST" });
-            router.push("/login");
-          }}
-          className="pm-logout-btn"
-          title="Zablokuj sejf"
-        >
-          ⏻
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Link href="/settings" className="pm-logout-btn" title="Ustawienia" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>
+            <Cog6ToothIcon style={{ width: 16, height: 16 }} />
+          </Link>
+          <button
+            onClick={async () => {
+              await fetch("/api/logout", { method: "POST" });
+              router.push("/login");
+            }}
+            className="pm-logout-btn"
+            title="Zablokuj sejf"
+          >
+            ⏻
+          </button>
+        </div>
       </header>
 
       {/* ── Main card ──────────────────────────────────────── */}

@@ -1,44 +1,39 @@
 import { NextResponse } from "next/server";
 import { createHmac, randomBytes } from "crypto";
 import { verify as argon2Verify } from "argon2";
+import { authenticator } from "otplib";
 import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
+import { logLoginAttempt } from "@/lib/auditLog";
+import { getAppConfig } from "@/lib/vault";
+import { verifySecretKeyHash } from "@/lib/secretKey";
 
 function signToken(token: string, secret: string): string {
   return createHmac("sha256", secret).update(token).digest("hex");
 }
 
-/**
- * Weryfikuje hasło względem hasha Argon2id (MASTER_PASSWORD_HASH)
- * lub jako fallback względem plaintext (MASTER_PASSWORD) dla środowiska dev.
- *
- * Na produkcji ustaw MASTER_PASSWORD_HASH (wygenerowany przez scripts/hash-password.mjs)
- * i usuń MASTER_PASSWORD z .env.
- */
-async function verifyMasterPassword(input: string): Promise<boolean> {
+/** Verify master password against Argon2id hash (production) or plaintext (dev). */
+async function verifyMasterPassword(password: string): Promise<boolean> {
   const hash = process.env.MASTER_PASSWORD_HASH;
 
-  // ── Tryb produkcyjny: Argon2id hash ─────────────────────────
   if (hash) {
     try {
-      return await argon2Verify(hash, input);
+      return await argon2Verify(hash, password);
     } catch {
       return false;
     }
   }
 
-  // ── Tryb dev: plaintext fallback (tylko poza produkcją) ──────
+  // Dev plaintext fallback — only outside production
   if (process.env.NODE_ENV === "production") {
-    console.error(
-      "[login] MASTER_PASSWORD_HASH nie jest ustawiony! Na produkcji wymagany jest hash Argon2id.",
-    );
+    console.error("[login] MASTER_PASSWORD_HASH not set — required in production.");
     return false;
   }
 
   const master = process.env.MASTER_PASSWORD;
   if (!master) return false;
 
-  // Stałoczasowe porównanie dla plaintext (dev)
-  const a = Buffer.from(input);
+  // Constant-time comparison
+  const a = Buffer.from(password);
   const b = Buffer.from(master);
   if (a.length !== b.length) return false;
   let diff = 0;
@@ -46,15 +41,18 @@ async function verifyMasterPassword(input: string): Promise<boolean> {
   return diff === 0;
 }
 
+const DELAY = () => new Promise((r) => setTimeout(r, 300 + Math.random() * 200));
+
 export async function POST(request: Request) {
-  // ── Rate limiting: 10 prób / 15 min per IP ─────────────────
+  // ── Rate limiting: 10 attempts / 15 min per IP ──────────────
   const ip = getClientIp(request);
   const rl = checkRateLimit(`login:${ip}`, 10, 15 * 60 * 1000);
 
   if (!rl.allowed) {
     const retryAfterSec = Math.ceil((rl.retryAfterMs ?? 60000) / 1000);
+    logLoginAttempt(ip, false);
     return NextResponse.json(
-      { error: `Zbyt wiele prób logowania. Spróbuj ponownie za ${retryAfterSec} sekund.` },
+      { error: `Too many login attempts. Try again in ${retryAfterSec} seconds.` },
       {
         status: 429,
         headers: {
@@ -67,34 +65,88 @@ export async function POST(request: Request) {
 
   const sessionSecret = process.env.NEXTAUTH_SECRET;
   if (!sessionSecret) {
-    return NextResponse.json(
-      { error: "Serwer nie jest prawidłowo skonfigurowany." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "Server misconfigured." }, { status: 500 });
   }
 
   const body = await request.json().catch(() => ({}));
   const inputPassword = body.password as string | undefined;
+  const inputSecretKey = body.secretKey as string | undefined;
 
   if (!inputPassword || typeof inputPassword !== "string") {
-    return NextResponse.json({ error: "Hasło jest wymagane." }, { status: 401 });
+    logLoginAttempt(ip, false);
+    return NextResponse.json({ error: "Password is required." }, { status: 401 });
   }
 
-  const ok = await verifyMasterPassword(inputPassword);
+  // ── Fetch app config once ────────────────────────────────────
+  const appConfig = await getAppConfig();
 
-  if (!ok) {
-    // Stałe opóźnienie – nie zdradzamy czy hasło jest bliskie
-    await new Promise((r) => setTimeout(r, 300 + Math.random() * 200));
+  // ── Secret Key verification (Vault-based, new approach) ──────
+  const skEnabledVault = appConfig.secretKeyEnabled === true && !!appConfig.secretKeyHash;
+  // Legacy env-var approach (combined hash) — honoured if Vault SK not configured
+  const skEnabledEnv = !skEnabledVault && process.env.SECRET_KEY_REQUIRED === "true";
+
+  if (skEnabledVault) {
+    if (!inputSecretKey) {
+      logLoginAttempt(ip, false);
+      return NextResponse.json(
+        { error: "Secret Key is required. Open the app on a trusted device or enter it from your Security Kit." },
+        { status: 401 },
+      );
+    }
+    const skOk = verifySecretKeyHash(inputSecretKey, appConfig.secretKeyHash!, sessionSecret);
+    if (!skOk) {
+      logLoginAttempt(ip, false);
+      await DELAY();
+      return NextResponse.json({ error: "Incorrect Secret Key." }, { status: 401 });
+    }
+  }
+
+  // ── Master password verification ─────────────────────────────
+  // Legacy: when env-var SK mode is active, password was hashed as "SK:password"
+  const passwordToVerify =
+    skEnabledEnv && inputSecretKey
+      ? `${inputSecretKey}:${inputPassword}`
+      : inputPassword;
+
+  if (skEnabledEnv && !inputSecretKey) {
+    logLoginAttempt(ip, false);
     return NextResponse.json(
-      { error: "Nieprawidłowe hasło główne." },
+      { error: "Secret Key is required. Open the app on a trusted device or enter it from your Security Kit." },
       { status: 401 },
     );
   }
 
-  // ── Reset licznika po udanym logowaniu ──────────────────────
-  checkRateLimit(`login:${ip}`, 0, 0);
+  const passwordOk = await verifyMasterPassword(passwordToVerify);
+  if (!passwordOk) {
+    logLoginAttempt(ip, false);
+    await DELAY();
+    return NextResponse.json({ error: "Incorrect master password." }, { status: 401 });
+  }
 
-  // ── Wygeneruj podpisany token sesji ─────────────────────────
+  // ── TOTP verification (after password is correct) ────────────
+  if (appConfig.totpEnabled && appConfig.totpSecret) {
+    const inputTotp = body.totpCode as string | undefined;
+    if (!inputTotp) {
+      return NextResponse.json(
+        { error: "2FA code required.", requireTotp: true },
+        { status: 401 },
+      );
+    }
+    const totpValid = authenticator.verify({
+      token: inputTotp,
+      secret: appConfig.totpSecret,
+    });
+    if (!totpValid) {
+      logLoginAttempt(ip, false);
+      await DELAY();
+      return NextResponse.json({ error: "Incorrect 2FA code." }, { status: 401 });
+    }
+  }
+
+  logLoginAttempt(ip, true);
+  checkRateLimit(`login:${ip}`, 0, 0); // Reset counter on success
+
+  // ── Issue signed session cookie ──────────────────────────────
   const token = randomBytes(32).toString("hex");
   const signature = signToken(token, sessionSecret);
 
