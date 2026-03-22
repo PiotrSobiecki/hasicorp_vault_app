@@ -1,7 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { ClipboardIcon, CheckIcon, DocumentDuplicateIcon } from "@heroicons/react/24/outline";
+import {
+  ClipboardIcon,
+  CheckIcon,
+  DocumentDuplicateIcon,
+} from "@heroicons/react/24/outline";
 
 interface CopyButtonProps {
   text: string;
@@ -31,7 +35,9 @@ export default function CopyButton({
       await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   if (variant === "icon") {
@@ -41,12 +47,20 @@ export default function CopyButton({
         className={className ?? "pm-icon-btn"}
         style={style}
         onClick={handleCopy}
-        title={copied ? "Skopiowano!" : (title ?? "Kopiuj")}
+        title={copied ? "Copied!" : (title ?? "Copy")}
       >
-        {copied
-          ? <CheckIcon style={{ width: iconSize, height: iconSize, color: "var(--success)", transition: "all 0.15s" }} />
-          : <ClipboardIcon style={{ width: iconSize, height: iconSize }} />
-        }
+        {copied ? (
+          <CheckIcon
+            style={{
+              width: iconSize,
+              height: iconSize,
+              color: "var(--success)",
+              transition: "all 0.15s",
+            }}
+          />
+        ) : (
+          <ClipboardIcon style={{ width: iconSize, height: iconSize }} />
+        )}
       </button>
     );
   }
@@ -60,15 +74,25 @@ export default function CopyButton({
         fontSize: 11,
         padding: "5px 10px",
         transition: "all 0.15s",
-        ...(copied ? { color: "var(--success)", borderColor: "rgba(0,200,120,0.35)" } : {}),
+        ...(copied
+          ? { color: "var(--success)", borderColor: "rgba(0,200,120,0.35)" }
+          : {}),
         ...style,
       }}
       onClick={handleCopy}
     >
-      {copied
-        ? <><CheckIcon style={{ width: iconSize, height: iconSize }} /> Copied!</>
-        : <><DocumentDuplicateIcon style={{ width: iconSize, height: iconSize }} /> {label}</>
-      }
+      {copied ? (
+        <>
+          <CheckIcon style={{ width: iconSize, height: iconSize }} /> Copied!
+        </>
+      ) : (
+        <>
+          <DocumentDuplicateIcon
+            style={{ width: iconSize, height: iconSize }}
+          />{" "}
+          {label}
+        </>
+      )}
     </button>
   );
 }
