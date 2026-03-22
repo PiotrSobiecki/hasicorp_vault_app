@@ -12,14 +12,14 @@ export async function DELETE(_request: Request, { params }: RouteContext) {
   try {
     const { id } = await params;
     await deleteVaultPassword(id);
-    return NextResponse.json({ message: "Wpis usunięty z Vault" });
+    return NextResponse.json({ message: "Entry deleted from Vault." });
   } catch (error) {
     console.error(
       "Error deleting password from Vault:",
       error instanceof Error ? error.message : String(error),
     );
     return NextResponse.json(
-      { error: "Wystąpił błąd podczas usuwania wpisu z Vault" },
+      { error: "Error deleting entry from Vault." },
       { status: 500 },
     );
   }
@@ -32,7 +32,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
 
     if (!password) {
       return NextResponse.json(
-        { error: "Wpis nie został znaleziony w Vault" },
+        { error: "Entry not found in Vault." },
         { status: 404 },
       );
     }
@@ -44,7 +44,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
       error instanceof Error ? error.message : String(error),
     );
     return NextResponse.json(
-      { error: "Wystąpił błąd podczas pobierania wpisu z Vault" },
+      { error: "Error fetching entry from Vault." },
       { status: 500 },
     );
   }
@@ -68,7 +68,7 @@ export async function PUT(request: Request, { params }: RouteContext) {
       error instanceof Error ? error.message : String(error),
     );
     return NextResponse.json(
-      { error: "Wystąpił błąd podczas aktualizacji wpisu w Vault" },
+      { error: "Error updating entry in Vault." },
       { status: 500 },
     );
   }

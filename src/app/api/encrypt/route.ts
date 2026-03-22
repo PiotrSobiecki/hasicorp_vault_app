@@ -11,7 +11,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ encryptedData });
   } catch {
     return NextResponse.json(
-      { error: "Wystąpił błąd podczas szyfrowania" },
+      { error: "Encryption error." },
       { status: 500 }
     );
   }

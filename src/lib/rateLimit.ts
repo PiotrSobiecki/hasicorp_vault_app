@@ -1,6 +1,6 @@
 /**
- * Prosty in-memory rate limiter (single-instance).
- * Dla Railway (jednoprocesorowe wdrożenie) w pełni wystarczający.
+ * Simple in-memory rate limiter (single-instance).
+ * Sufficient for Railway single-process deployments.
  */
 
 interface Bucket {
@@ -10,7 +10,7 @@ interface Bucket {
 
 const store = new Map<string, Bucket>();
 
-// Automatyczne czyszczenie starych wpisów co 5 minut
+// Auto-clean stale entries every 5 minutes
 setInterval(() => {
   const now = Date.now();
   for (const [key, bucket] of store) {
@@ -19,14 +19,14 @@ setInterval(() => {
 }, 5 * 60 * 1000);
 
 /**
- * Sprawdza czy dany klucz (np. IP) nie przekroczył limitu.
+ * Check whether a given key (e.g. IP) has exceeded the limit.
  *
- * @param key       identyfikator – najczęściej adres IP
- * @param limit     maksymalna liczba prób w oknie
- * @param windowMs  długość okna w milisekundach
- * @returns `allowed` = true jeśli żądanie jest dozwolone
- *          `remaining` = ile prób pozostało
- *          `retryAfterMs` = ile ms do resetu (tylko gdy zablokowany)
+ * @param key       identifier — usually an IP address
+ * @param limit     maximum attempts within the window
+ * @param windowMs  window length in milliseconds
+ * @returns `allowed` = true if the request is permitted
+ *          `remaining` = attempts left
+ *          `retryAfterMs` = ms until reset (only when blocked)
  */
 export function checkRateLimit(
   key: string,
@@ -53,7 +53,7 @@ export function checkRateLimit(
   return { allowed: true, remaining: limit - bucket.count };
 }
 
-/** Wyciąga IP klienta z nagłówków (Railway/proxy aware). */
+/** Extract client IP from headers (Railway/proxy aware). */
 export function getClientIp(request: Request): string {
   const fwd = (request.headers as Headers).get("x-forwarded-for");
   if (fwd) return fwd.split(",")[0].trim();

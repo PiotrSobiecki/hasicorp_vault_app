@@ -25,17 +25,17 @@ export async function POST(request: Request) {
   if (body.action === "verify") {
     const { secret, code } = body as { secret?: string; code?: string };
     if (!secret || !code) {
-      return NextResponse.json({ error: "Brak kodu lub sekretu." }, { status: 400 });
+      return NextResponse.json({ error: "Missing code or secret." }, { status: 400 });
     }
     const valid = authenticator.verify({ token: code, secret });
     if (!valid) {
-      return NextResponse.json({ error: "Nieprawidłowy kod. Sprawdź czas w telefonie." }, { status: 400 });
+      return NextResponse.json({ error: "Invalid code. Check the time on your device." }, { status: 400 });
     }
     await saveAppConfig({ totpSecret: secret, totpEnabled: true });
     return NextResponse.json({ ok: true });
   }
 
-  return NextResponse.json({ error: "Nieznana akcja." }, { status: 400 });
+  return NextResponse.json({ error: "Unknown action." }, { status: 400 });
 }
 
 /** DELETE — disable TOTP (requires current code for confirmation) */
@@ -50,7 +50,7 @@ export async function DELETE(request: Request) {
     });
     if (!valid) {
       return NextResponse.json(
-        { error: "Nieprawidłowy kod 2FA. Potwierdź wyłączenie aktualnym kodem." },
+        { error: "Invalid 2FA code. Confirm with your current code to disable." },
         { status: 400 },
       );
     }

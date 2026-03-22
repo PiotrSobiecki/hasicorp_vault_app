@@ -36,7 +36,7 @@ export default function QrScanner({ onScan, onClose }: QrScannerProps) {
         rafRef.current = requestAnimationFrame(scanFrame);
       }
     } catch {
-      setError("Brak dostępu do kamery. Sprawdź uprawnienia przeglądarki.");
+      setError("Camera access denied. Check your browser permissions.");
     }
   }
 
@@ -94,9 +94,9 @@ export default function QrScanner({ onScan, onClose }: QrScannerProps) {
         <div className="pm-qr-header">
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <CameraIcon style={{ width: 16, height: 16, color: "var(--accent)" }} />
-            <span style={{ fontWeight: 600, fontSize: 14 }}>Skanuj kod QR (2FA)</span>
+            <span style={{ fontWeight: 600, fontSize: 14 }}>Scan QR code (2FA)</span>
           </div>
-          <button className="pm-icon-btn" onClick={onClose} title="Zamknij">
+          <button className="pm-icon-btn" onClick={onClose} title="Close">
             <XMarkIcon style={{ width: 16, height: 16 }} />
           </button>
         </div>
@@ -126,7 +126,7 @@ export default function QrScanner({ onScan, onClose }: QrScannerProps) {
         </div>
 
         <p style={{ fontSize: 12, color: "var(--text-muted)", textAlign: "center", padding: "0 16px 16px" }}>
-          Nakieruj kamerę na kod QR z aplikacji 2FA (Google Authenticator, Authy itp.)
+          Point the camera at the QR code from your 2FA app (Google Authenticator, Authy, etc.)
         </p>
       </div>
     </div>

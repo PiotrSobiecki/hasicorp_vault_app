@@ -55,7 +55,7 @@ export default function PasswordForm({ initialData, onSuccess, onCancel }: Passw
     try {
       const url    = initialData ? `/api/passwords/${initialData.id}` : "/api/passwords";
       const method = initialData ? "PUT" : "POST";
-      // Nie wysyłaj pola UI (passwordLength) do API
+      // Don't send the UI-only field (passwordLength) to the API
       const { passwordLength: _pl, ...payload } = formData;
       const res    = await fetch(url, {
         method,
@@ -64,37 +64,37 @@ export default function PasswordForm({ initialData, onSuccess, onCancel }: Passw
       });
       if (!res.ok) throw new Error();
       const saved = await res.json();
-      toast({ title: initialData ? "Zapisano zmiany" : "Wpis dodany", status: "success", duration: 3000, isClosable: true });
+      toast({ title: initialData ? "Changes saved" : "Entry added", status: "success", duration: 3000, isClosable: true });
       onSuccess(saved);
     } catch {
-      toast({ title: "Błąd podczas zapisywania", status: "error", duration: 3000, isClosable: true });
+      toast({ title: "Error saving entry", status: "error", duration: 3000, isClosable: true });
     }
   };
 
 
   return (
     <form onSubmit={handleSubmit} className="pm-form">
-      <div className="pm-form-title">{initialData ? "Edytuj wpis" : "Nowy wpis"}</div>
+      <div className="pm-form-title">{initialData ? "Edit entry" : "New entry"}</div>
 
       {/* Title */}
       <div className="pm-form-group">
-        <label className="pm-form-label">Tytuł *</label>
+        <label className="pm-form-label">Title *</label>
         <input className="pm-form-input" type="text" required
-          placeholder="np. Gmail, GitHub…"
+          placeholder="e.g. Gmail, GitHub…"
           value={formData.title} onChange={(e) => set("title", e.target.value)} />
       </div>
 
       {/* Username */}
       <div className="pm-form-group">
-        <label className="pm-form-label">Nazwa użytkownika *</label>
+        <label className="pm-form-label">Username *</label>
         <input className="pm-form-input" type="text" required
-          placeholder="login lub e-mail"
+          placeholder="login or e-mail"
           value={formData.username} onChange={(e) => set("username", e.target.value)} />
       </div>
 
       {/* Password */}
       <div className="pm-form-group">
-        <label className="pm-form-label">Hasło *</label>
+        <label className="pm-form-label">Password *</label>
         <div className="pm-form-row">
           <input className="pm-form-input" type={showPassword ? "text" : "password"} required
             value={formData.password} onChange={(e) => set("password", e.target.value)} />
@@ -109,36 +109,36 @@ export default function PasswordForm({ initialData, onSuccess, onCancel }: Passw
             value={formData.passwordLength}
             onChange={(e) => set("passwordLength", parseInt(e.target.value))}
           />
-          <span className="pm-slider-label">{formData.passwordLength} znaków</span>
+          <span className="pm-slider-label">{formData.passwordLength} chars</span>
         </div>
         <button type="button" className="pm-btn-secondary" style={{ marginTop: 8, width: "100%", justifyContent: "center" }} onClick={generatePassword}>
           <SparklesIcon style={{ width: 14, height: 14 }} />
-          Generuj hasło
+          Generate password
         </button>
       </div>
 
       {/* Extra key */}
       <div className="pm-form-group">
-        <label className="pm-form-label">Dodatkowy klucz <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>(opcjonalnie)</span></label>
+        <label className="pm-form-label">Extra key <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>(optional)</span></label>
         <div className="pm-form-row">
           <input className="pm-form-input" type={showKey ? "text" : "password"}
             value={formData.key} onChange={(e) => set("key", e.target.value)} />
           <button type="button" className="pm-icon-btn" onClick={() => setShowKey(!showKey)}>
             {showKey ? <EyeSlashIcon style={{ width: 16, height: 16 }} /> : <EyeIcon style={{ width: 16, height: 16 }} />}
           </button>
-          <CopyButton variant="icon" text={formData.key} iconSize={16} title="Kopiuj klucz" />
+          <CopyButton variant="icon" text={formData.key} iconSize={16} title="Copy key" />
         </div>
       </div>
 
       {/* 2FA */}
       <div className="pm-form-group">
-        <label className="pm-form-label">Seed 2FA <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>(opcjonalnie)</span></label>
+        <label className="pm-form-label">2FA seed <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>(optional)</span></label>
         <div className="pm-form-row">
           <input className="pm-form-input" type="text"
             placeholder="CBY5447MAGBR9Y37"
             value={formData.twoFactorCode}
             onChange={(e) => set("twoFactorCode", e.target.value.replace(/\s+/g, ""))} />
-          <button type="button" className="pm-icon-btn" title="Skanuj kod QR" onClick={() => setShowQrScanner(true)}>
+          <button type="button" className="pm-icon-btn" title="Scan QR code" onClick={() => setShowQrScanner(true)}>
             <QrCodeIcon style={{ width: 16, height: 16 }} />
           </button>
         </div>
@@ -156,7 +156,7 @@ export default function PasswordForm({ initialData, onSuccess, onCancel }: Passw
 
       {/* URL */}
       <div className="pm-form-group">
-        <label className="pm-form-label">URL <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>(opcjonalnie)</span></label>
+        <label className="pm-form-label">URL <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>(optional)</span></label>
         <input className="pm-form-input" type="url"
           placeholder="https://example.com"
           value={formData.url} onChange={(e) => set("url", e.target.value)} />
@@ -164,7 +164,7 @@ export default function PasswordForm({ initialData, onSuccess, onCancel }: Passw
 
       {/* Notes */}
       <div className="pm-form-group">
-        <label className="pm-form-label">Notatki <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>(opcjonalnie)</span></label>
+        <label className="pm-form-label">Notes <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>(optional)</span></label>
         <textarea className="pm-form-input" rows={3}
           value={formData.notes} onChange={(e) => set("notes", e.target.value)} />
       </div>
@@ -172,11 +172,11 @@ export default function PasswordForm({ initialData, onSuccess, onCancel }: Passw
       {/* Actions */}
       <div className="pm-form-actions">
         <button type="submit" className="pm-btn-primary">
-          {initialData ? "Zapisz zmiany" : "Dodaj wpis"}
+          {initialData ? "Save changes" : "Add entry"}
         </button>
         {onCancel && (
           <button type="button" className="pm-btn-ghost" onClick={onCancel}>
-            Anuluj
+            Cancel
           </button>
         )}
       </div>

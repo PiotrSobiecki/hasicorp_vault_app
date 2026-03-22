@@ -15,10 +15,10 @@ const VAULT_MOUNT_NAME =
 const VAULT_PASSWORDS_PATH = process.env.VAULT_PASSWORDS_PATH || "passwords";
 
 if (!VAULT_ADDR || !VAULT_TOKEN) {
-  // W środowisku serwerowym Next wyrzucimy błąd dopiero przy pierwszym użyciu funkcji,
-  // żeby dev od razu zobaczył problem w logach.
+  // In Next.js server environment, throw on first use so the developer
+  // sees the problem immediately in the logs.
   console.warn(
-    "[vault] VAULT_ADDR lub VAULT_TOKEN nie są ustawione – API haseł nie będzie działać.",
+    "[vault] VAULT_ADDR or VAULT_TOKEN is not set — password API will not work.",
   );
 }
 
@@ -53,7 +53,7 @@ async function vaultRequest<T>(
     return res as unknown as T;
   }
 
-  // 204 No Content (np. DELETE metadata) – brak body, zwracamy pusty obiekt
+  // 204 No Content (e.g. DELETE metadata) — no body, return empty object
   if (res.status === 204) {
     return {} as T;
   }
@@ -68,10 +68,10 @@ async function listIds(): Promise<string[]> {
       { method: "LIST" },
     );
     const keys: string[] = json.data?.keys ?? [];
-    // keys z Vault mogą mieć końcowy "/"
+    // keys from Vault may have a trailing "/"
     return keys.map((k) => k.replace(/\/$/, ""));
   } catch (e) {
-    // Jeśli nic nie ma pod tym path – Vault zwraca 404, traktujemy jako pustą listę
+    // If nothing exists at this path — Vault returns 404, treat as empty list
     if (e instanceof Error && /404/.test(e.message)) {
       return [];
     }
@@ -101,7 +101,7 @@ export async function listVaultPasswords(): Promise<Password[]> {
         twoFactorCode: d.twoFactorCode ?? undefined,
       });
     } catch {
-      // Pomijamy wpisy, których nie da się odczytać
+      // Skip entries that cannot be read
       continue;
     }
   }
@@ -171,7 +171,7 @@ export async function updateVaultPassword(
 }
 
 export async function deleteVaultPassword(id: string): Promise<void> {
-  // Usuwamy metadane (wszystkie wersje) – twarde usunięcie
+  // Delete metadata (all versions) — hard delete
   await vaultRequest(`${VAULT_MOUNT_NAME}/metadata/${dataPath(id)}`, {
     method: "DELETE",
   });

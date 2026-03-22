@@ -108,7 +108,7 @@ export default function PasswordList({
         setPasswords(data);
       }
     } catch (error) {
-      console.error("Błąd podczas pobierania haseł:", error);
+      console.error("Error fetching passwords:", error);
     }
   };
 
@@ -139,12 +139,12 @@ export default function PasswordList({
       const res = await fetch(`/api/passwords/${id}`, { method: "DELETE" });
       if (res.ok) {
         await fetchPasswords();
-        toast({ title: "Wpis usunięty", status: "success", duration: 3000, isClosable: true });
+        toast({ title: "Entry deleted", status: "success", duration: 3000, isClosable: true });
       } else {
-        toast({ title: "Nie udało się usunąć wpisu", status: "error", duration: 3000, isClosable: true });
+        toast({ title: "Failed to delete entry", status: "error", duration: 3000, isClosable: true });
       }
     } catch {
-      toast({ title: "Błąd podczas usuwania", status: "error", duration: 3000, isClosable: true });
+      toast({ title: "Error deleting entry", status: "error", duration: 3000, isClosable: true });
     }
   };
 
@@ -159,12 +159,12 @@ export default function PasswordList({
       if (res.ok) {
         setEditingPassword(null);
         await fetchPasswords();
-        toast({ title: "Zapisano zmiany", status: "success", duration: 3000, isClosable: true });
+        toast({ title: "Changes saved", status: "success", duration: 3000, isClosable: true });
       } else {
-        toast({ title: "Nie udało się zapisać zmian", status: "error", duration: 3000, isClosable: true });
+        toast({ title: "Failed to save changes", status: "error", duration: 3000, isClosable: true });
       }
     } catch {
-      toast({ title: "Błąd podczas zapisywania", status: "error", duration: 3000, isClosable: true });
+      toast({ title: "Error saving entry", status: "error", duration: 3000, isClosable: true });
     }
   };
 
@@ -185,9 +185,9 @@ export default function PasswordList({
       a.href = url; a.download = fileName;
       document.body.appendChild(a); a.click();
       document.body.removeChild(a); URL.revokeObjectURL(url);
-      toast({ title: "Eksport gotowy", status: "success", duration: 3000, isClosable: true });
+      toast({ title: "Export ready", status: "success", duration: 3000, isClosable: true });
     } catch {
-      toast({ title: "Błąd eksportu", status: "error", duration: 3000, isClosable: true });
+      toast({ title: "Export error", status: "error", duration: 3000, isClosable: true });
     }
   };
 
@@ -201,7 +201,7 @@ export default function PasswordList({
       try {
         const text = await file.text();
 
-        // Spróbuj jako plain JSON; jeśli nie – odszyfruj server-side (klucz nie jest wystawiany klientowi)
+        // Try as plain JSON; if that fails — decrypt server-side (key is never exposed to the client)
         let importedData: { passwords: unknown[] };
         try {
           importedData = JSON.parse(text);
@@ -211,13 +211,13 @@ export default function PasswordList({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ encryptedData: text }),
           });
-          if (!decryptRes.ok) throw new Error("Deszyfrowanie nie powiodło się");
+          if (!decryptRes.ok) throw new Error("Decryption failed");
           const { data } = await decryptRes.json();
           importedData = data;
         }
 
         if (!importedData?.passwords || !Array.isArray(importedData.passwords)) {
-          throw new Error("Nieprawidłowy format");
+          throw new Error("Invalid format");
         }
 
         const res = await fetch("/api/passwords/import", {
@@ -227,12 +227,12 @@ export default function PasswordList({
         });
         if (res.ok) {
           await fetchPasswords();
-          toast({ title: "Import zakończony", description: `Zaimportowano ${importedData.passwords.length} wpisów.`, status: "success", duration: 4000, isClosable: true });
+          toast({ title: "Import complete", description: `Imported ${importedData.passwords.length} entries.`, status: "success", duration: 4000, isClosable: true });
         } else {
-          toast({ title: "Błąd importu", status: "error", duration: 3000, isClosable: true });
+          toast({ title: "Import error", status: "error", duration: 3000, isClosable: true });
         }
       } catch {
-        toast({ title: "Błąd podczas importu", status: "error", duration: 3000, isClosable: true });
+        toast({ title: "Error during import", status: "error", duration: 3000, isClosable: true });
       }
     };
     input.click();
@@ -250,15 +250,15 @@ export default function PasswordList({
     <>
       {/* ── Section header ─────────────────────────────────── */}
       <div className="pm-section-header">
-        <span className="pm-section-title">{filtered.length} wpisów</span>
+        <span className="pm-section-title">{filtered.length} {filtered.length === 1 ? "entry" : "entries"}</span>
         <div className="pm-section-actions">
-          <button className="pm-btn-secondary" onClick={handleExport} title="Eksportuj do pliku">
+          <button className="pm-btn-secondary" onClick={handleExport} title="Export to file">
             <ArrowDownTrayIcon style={{ width: 14, height: 14 }} />
-            Eksportuj
+            Export
           </button>
-          <button className="pm-btn-secondary" onClick={handleImportClick} title="Importuj z pliku">
+          <button className="pm-btn-secondary" onClick={handleImportClick} title="Import from file">
             <ArrowUpTrayIcon style={{ width: 14, height: 14 }} />
-            Importuj
+            Import
           </button>
         </div>
       </div>
@@ -267,7 +267,7 @@ export default function PasswordList({
       <div className="pm-list">
         {filtered.length === 0 && (
           <div className="pm-empty">
-            {searchQuery ? "Brak wyników dla podanej frazy." : "Brak zapisanych haseł. Dodaj pierwszy wpis."}
+            {searchQuery ? "No results for this search." : "No saved passwords. Add your first entry."}
           </div>
         )}
 
@@ -303,28 +303,28 @@ export default function PasswordList({
 
                     {/* Username */}
                     <div className="pm-field">
-                      <div className="pm-field-label">Nazwa użytkownika</div>
+                      <div className="pm-field-label">Username</div>
                       <div className="pm-field-row">
                         <input type="text" readOnly value={p.username} className="pm-field-input" />
-                        <CopyButton variant="icon" text={p.username} iconSize={16} title="Kopiuj login" />
+                        <CopyButton variant="icon" text={p.username} iconSize={16} title="Copy username" />
                       </div>
                     </div>
 
                     {/* Password */}
                     <div className="pm-field">
-                      <div className="pm-field-label">Hasło</div>
+                      <div className="pm-field-label">Password</div>
                       <div className="pm-field-row">
                         <input
                           type={showPasswordId === p.id ? "text" : "password"}
                           readOnly value={p.password}
                           className="pm-field-input"
                         />
-                        <button className="pm-icon-btn" onClick={() => setShowPasswordId(showPasswordId === p.id ? null : p.id)} title={showPasswordId === p.id ? "Ukryj" : "Pokaż"}>
+                        <button className="pm-icon-btn" onClick={() => setShowPasswordId(showPasswordId === p.id ? null : p.id)} title={showPasswordId === p.id ? "Hide" : "Show"}>
                           {showPasswordId === p.id
                             ? <EyeSlashIcon style={{ width: 16, height: 16 }} />
                             : <EyeIcon style={{ width: 16, height: 16 }} />}
                         </button>
-                        <CopyButton variant="icon" text={p.password} iconSize={16} title="Kopiuj hasło" />
+                        <CopyButton variant="icon" text={p.password} iconSize={16} title="Copy password" />
                       </div>
                     </div>
 
@@ -336,7 +336,7 @@ export default function PasswordList({
                           <a href={p.url} target="_blank" rel="noopener noreferrer" className="pm-field-input" style={{ color: "#5a9fff", textDecoration: "none", display: "flex", alignItems: "center" }}>
                             {p.url}
                           </a>
-                          <CopyButton variant="icon" text={p.url!} iconSize={16} title="Kopiuj URL" />
+                          <CopyButton variant="icon" text={p.url!} iconSize={16} title="Copy URL" />
                         </div>
                       </div>
                     )}
@@ -344,10 +344,10 @@ export default function PasswordList({
                     {/* 2FA */}
                     {p.twoFactorCode && (
                       <div className="pm-field">
-                        <div className="pm-field-label">Kod 2FA</div>
+                        <div className="pm-field-label">2FA code</div>
                         <div className="pm-field-row">
                           <code className="pm-totp-code">{totpCodes[p.id] || "------"}</code>
-                          <CopyButton variant="icon" text={(totpCodes[p.id] || "").split(" ")[0]} iconSize={16} title="Kopiuj kod 2FA" />
+                          <CopyButton variant="icon" text={(totpCodes[p.id] || "").split(" ")[0]} iconSize={16} title="Copy 2FA code" />
                         </div>
                       </div>
                     )}
@@ -355,19 +355,19 @@ export default function PasswordList({
                     {/* Extra key */}
                     {p.key && (
                       <div className="pm-field">
-                        <div className="pm-field-label">Dodatkowy klucz</div>
+                        <div className="pm-field-label">Extra key</div>
                         <div className="pm-field-row">
                           <input
                             type={showKeyId === p.id ? "text" : "password"}
                             readOnly value={p.key}
                             className="pm-field-input"
                           />
-                          <button className="pm-icon-btn" onClick={() => setShowKeyId(showKeyId === p.id ? null : p.id)} title={showKeyId === p.id ? "Ukryj" : "Pokaż"}>
+                          <button className="pm-icon-btn" onClick={() => setShowKeyId(showKeyId === p.id ? null : p.id)} title={showKeyId === p.id ? "Hide" : "Show"}>
                             {showKeyId === p.id
                               ? <EyeSlashIcon style={{ width: 16, height: 16 }} />
                               : <EyeIcon style={{ width: 16, height: 16 }} />}
                           </button>
-                          <CopyButton variant="icon" text={p.key!} iconSize={16} title="Kopiuj klucz" />
+                          <CopyButton variant="icon" text={p.key!} iconSize={16} title="Copy key" />
                         </div>
                       </div>
                     )}
@@ -375,7 +375,7 @@ export default function PasswordList({
                     {/* Notes */}
                     {p.notes && (
                       <div className="pm-field">
-                        <div className="pm-field-label">Notatki</div>
+                        <div className="pm-field-label">Notes</div>
                         <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6, padding: "9px 12px", background: "var(--bg-input)", borderRadius: "var(--r-sm)", border: "1px solid var(--border)" }}>
                           {p.notes}
                         </p>
@@ -384,13 +384,13 @@ export default function PasswordList({
 
                     {/* Actions */}
                     <div className="pm-item-actions">
-                      <button className="pm-icon-btn" onClick={() => setEditingPassword(p)} title="Edytuj">
+                      <button className="pm-icon-btn" onClick={() => setEditingPassword(p)} title="Edit">
                         <PencilIcon style={{ width: 16, height: 16 }} />
                       </button>
                       <button
                         className="pm-icon-btn danger"
                         onClick={() => { setPasswordToDelete(p); setConfirmDeleteChecked(false); }}
-                        title="Usuń"
+                        title="Delete"
                       >
                         <TrashIcon style={{ width: 16, height: 16 }} />
                       </button>
@@ -413,13 +413,13 @@ export default function PasswordList({
           >
             <AlertDialogHeader fontSize="15px" fontWeight="700" borderBottom="1px solid" borderColor="whiteAlpha.100" pb={4} display="flex" alignItems="center" gap={2} color="red.400">
               <TrashIcon style={{ width: 18, height: 18 }} />
-              Usuń wpis
+              Delete entry
             </AlertDialogHeader>
             <AlertDialogBody pt={5} pb={3}>
               <p style={{ color: "#9ca3af", fontSize: 14, lineHeight: 1.6 }}>
                 Wpis <strong style={{ color: "#e8eaf0" }}>{passwordToDelete?.title}</strong> zostanie
-                {" "}<strong style={{ color: "#e8eaf0" }}>trwale usunięty</strong> z HashiCorp Vault.
-                Tej operacji nie można cofnąć.
+                {" "}<strong style={{ color: "#e8eaf0" }}>permanently deleted</strong> from HashiCorp Vault.
+                This action cannot be undone.
               </p>
               <label style={{
                 marginTop: 16, display: "flex", alignItems: "flex-start", gap: 10,
@@ -433,7 +433,7 @@ export default function PasswordList({
                   checked={confirmDeleteChecked}
                   onChange={(e) => setConfirmDeleteChecked(e.target.checked)}
                 />
-                <span>Rozumiem, że wpis zostanie bezpowrotnie usunięty.</span>
+                <span>I understand this entry will be permanently deleted.</span>
               </label>
             </AlertDialogBody>
             <AlertDialogFooter borderTop="1px solid" borderColor="whiteAlpha.100" gap={3} pt={4}>
@@ -441,7 +441,7 @@ export default function PasswordList({
                 bg="whiteAlpha.100" color="gray.300" border="1px solid" borderColor="whiteAlpha.200"
                 _hover={{ bg: "whiteAlpha.200", color: "white" }} borderRadius="8px" size="sm"
               >
-                Anuluj
+                Cancel
               </Button>
               <Button
                 isDisabled={!confirmDeleteChecked}
@@ -457,7 +457,7 @@ export default function PasswordList({
                 borderRadius="8px" size="sm"
                 leftIcon={<TrashIcon style={{ width: 14, height: 14 }} />}
               >
-                Usuń na zawsze
+                Delete forever
               </Button>
             </AlertDialogFooter>
           </AlertDialogContent>

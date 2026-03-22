@@ -47,7 +47,7 @@ export async function middleware(request: NextRequest) {
   if (!sessionSecret) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json(
-        { error: "Serwer nie jest prawidłowo skonfigurowany." },
+        { error: "Server misconfigured." },
         { status: 500 },
       );
     }
@@ -66,7 +66,7 @@ export async function middleware(request: NextRequest) {
   if (pathname.startsWith("/api/")) {
     if (!isAuthenticated) {
       return NextResponse.json(
-        { error: "Nieautoryzowany dostęp." },
+        { error: "Unauthorized." },
         { status: 401 },
       );
     }

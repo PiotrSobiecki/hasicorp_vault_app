@@ -19,7 +19,7 @@ export async function POST(request: Request) {
       error instanceof Error ? error.message : String(error),
     );
     return NextResponse.json(
-      { error: "Wystąpił błąd podczas zapisywania wpisu w Vault" },
+      { error: "Error saving entry to Vault." },
       { status: 500 },
     );
   }
@@ -35,7 +35,7 @@ export async function GET() {
       error instanceof Error ? error.message : String(error),
     );
     return NextResponse.json(
-      { error: "Wystąpił błąd podczas pobierania wpisów z Vault" },
+      { error: "Error fetching entries from Vault." },
       { status: 500 },
     );
   }

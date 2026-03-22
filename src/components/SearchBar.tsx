@@ -13,7 +13,7 @@ export default function SearchBar({ value, onChange }: SearchBarProps) {
       <MagnifyingGlassIcon className="pm-search-icon" style={{ width: 15, height: 15 }} />
       <input
         type="text"
-        placeholder="Szukaj wpisów..."
+        placeholder="Search entries..."
         className="pm-search"
         value={value}
         onChange={(e) => onChange(e.target.value)}

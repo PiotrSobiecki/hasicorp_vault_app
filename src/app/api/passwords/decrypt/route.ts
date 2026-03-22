@@ -7,7 +7,7 @@ export async function POST(request: Request) {
 
     if (!encryptedData || typeof encryptedData !== "string") {
       return NextResponse.json(
-        { error: "Brak danych do odszyfrowania" },
+        { error: "No data to decrypt." },
         { status: 400 },
       );
     }
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     const key = process.env.ENCRYPTION_KEY;
     if (!key) {
       return NextResponse.json(
-        { error: "Serwer nie jest prawidłowo skonfigurowany." },
+        { error: "Server misconfigured." },
         { status: 500 },
       );
     }
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ data });
   } catch {
     return NextResponse.json(
-      { error: "Nie udało się odszyfrować pliku. Sprawdź czy plik jest poprawny." },
+      { error: "Failed to decrypt file. Check that the file is valid." },
       { status: 400 },
     );
   }
