@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createHmac, randomBytes } from "crypto";
+import type { NextRequest } from "next/server";
+import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { verify as argon2Verify } from "argon2";
 import { authenticator } from "otplib";
 import { checkRateLimit, getClientIp } from "@/lib/rateLimit";
@@ -7,8 +8,26 @@ import { logLoginAttempt } from "@/lib/auditLog";
 import { getAppConfig } from "@/lib/vault";
 import { verifySecretKeyHash } from "@/lib/secretKey";
 
-function signToken(token: string, secret: string): string {
-  return createHmac("sha256", secret).update(token).digest("hex");
+function signToken(message: string, secret: string): string {
+  return createHmac("sha256", secret).update(message).digest("hex");
+}
+
+// ── Device trust cookie helpers ──────────────────────────────
+function signDeviceToken(token: string, secret: string): string {
+  return createHmac("sha256", secret).update(`dt:${token}`).digest("hex");
+}
+
+function verifyDeviceCookie(cookieValue: string, secret: string): boolean {
+  const parts = cookieValue.split(".");
+  if (parts.length !== 2) return false;
+  const [token, sig] = parts;
+  if (!token || !sig) return false;
+  const expected = signDeviceToken(token, secret);
+  try {
+    return timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(sig, "hex"));
+  } catch {
+    return false;
+  }
 }
 
 /** Verify master password against Argon2id hash (production) or plaintext (dev). */
@@ -43,7 +62,7 @@ async function verifyMasterPassword(password: string): Promise<boolean> {
 
 const DELAY = () => new Promise((r) => setTimeout(r, 300 + Math.random() * 200));
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   // ── Rate limiting: 10 attempts / 15 min per IP ──────────────
   const ip = getClientIp(request);
   const rl = checkRateLimit(`login:${ip}`, 10, 15 * 60 * 1000);
@@ -71,6 +90,13 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const inputPassword = body.password as string | undefined;
   const inputSecretKey = body.secretKey as string | undefined;
+  const rememberDevice = body.rememberDevice === true;
+
+  // ── Device trust: check pm_device cookie to skip TOTP ───────
+  const deviceCookieValue = request.cookies.get("pm_device")?.value;
+  const deviceTrusted = deviceCookieValue
+    ? verifyDeviceCookie(deviceCookieValue, sessionSecret)
+    : false;
 
   if (!inputPassword || typeof inputPassword !== "string") {
     logLoginAttempt(ip, false);
@@ -123,8 +149,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Incorrect master password." }, { status: 401 });
   }
 
-  // ── TOTP verification (after password is correct) ────────────
-  if (appConfig.totpEnabled && appConfig.totpSecret) {
+  // ── TOTP verification (skipped on trusted device) ────────────
+  let totpJustVerified = false;
+  if (appConfig.totpEnabled && appConfig.totpSecret && !deviceTrusted) {
     const inputTotp = body.totpCode as string | undefined;
     if (!inputTotp) {
       return NextResponse.json(
@@ -141,22 +168,38 @@ export async function POST(request: Request) {
       await DELAY();
       return NextResponse.json({ error: "Incorrect 2FA code." }, { status: 401 });
     }
+    totpJustVerified = true;
   }
 
   logLoginAttempt(ip, true);
   checkRateLimit(`login:${ip}`, 0, 0); // Reset counter on success
 
-  // ── Issue signed session cookie ──────────────────────────────
+  // ── Issue signed session cookie (30 days, issuedAt for 48h reauth) ──
   const token = randomBytes(32).toString("hex");
-  const signature = signToken(token, sessionSecret);
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const signature = signToken(`${token}.${issuedAt}`, sessionSecret);
 
   const res = NextResponse.json({ ok: true });
-  res.cookies.set("pm_session", `${token}.${signature}`, {
+  res.cookies.set("pm_session", `${token}.${issuedAt}.${signature}`, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
     path: "/",
-    maxAge: 60 * 60 * 8,
+    maxAge: 30 * 24 * 60 * 60,
   });
+
+  // ── Set device trust cookie if TOTP was just verified and user wants to remember ──
+  if (totpJustVerified && rememberDevice) {
+    const deviceToken = randomBytes(32).toString("hex");
+    const deviceSig = signDeviceToken(deviceToken, sessionSecret);
+    res.cookies.set("pm_device", `${deviceToken}.${deviceSig}`, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      path: "/",
+      maxAge: 30 * 24 * 60 * 60,
+    });
+  }
+
   return res;
 }

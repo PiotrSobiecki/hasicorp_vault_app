@@ -4,16 +4,27 @@ import type { NextRequest } from "next/server";
 // Public routes that don't require authentication
 const PUBLIC_API_ROUTES = new Set(["/api/login", "/api/logout", "/api/favicon", "/api/login-config"]);
 
+const PASSWORD_REAUTH_SECONDS = 48 * 60 * 60;
+
+interface SessionResult {
+  valid: boolean;
+  needsReauth: boolean;
+}
+
 async function verifySession(
   cookieValue: string,
   secret: string,
-): Promise<boolean> {
+): Promise<SessionResult> {
   const parts = cookieValue.split(".");
-  // Token and signature are both hex strings (no dots), so exactly 2 parts
-  if (parts.length !== 2) return false;
-  const [token, signature] = parts;
-  if (!token || !signature) return false;
+  // Format: {token}.{issuedAt}.{signature}
+  if (parts.length !== 3) return { valid: false, needsReauth: false };
+  const [token, issuedAtStr, signature] = parts;
+  if (!token || !issuedAtStr || !signature) return { valid: false, needsReauth: false };
 
+  const issuedAt = parseInt(issuedAtStr, 10);
+  if (isNaN(issuedAt)) return { valid: false, needsReauth: false };
+
+  const message = `${token}.${issuedAtStr}`;
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(
     "raw",
@@ -23,18 +34,26 @@ async function verifySession(
     ["sign"],
   );
 
-  const mac = await crypto.subtle.sign("HMAC", key, enc.encode(token));
+  const mac = await crypto.subtle.sign("HMAC", key, enc.encode(message));
   const expected = Array.from(new Uint8Array(mac))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 
   // Constant-time comparison to prevent timing attacks
-  if (expected.length !== signature.length) return false;
+  if (expected.length !== signature.length) return { valid: false, needsReauth: false };
   let diff = 0;
   for (let i = 0; i < expected.length; i++) {
     diff |= expected.charCodeAt(i) ^ signature.charCodeAt(i);
   }
-  return diff === 0;
+  if (diff !== 0) return { valid: false, needsReauth: false };
+
+  // Valid signature — check whether password re-verification is needed (48h)
+  const now = Math.floor(Date.now() / 1000);
+  if (now - issuedAt > PASSWORD_REAUTH_SECONDS) {
+    return { valid: true, needsReauth: true };
+  }
+
+  return { valid: true, needsReauth: false };
 }
 
 export async function middleware(request: NextRequest) {
@@ -58,15 +77,18 @@ export async function middleware(request: NextRequest) {
   if (PUBLIC_API_ROUTES.has(pathname)) return NextResponse.next();
 
   const cookie = request.cookies.get("pm_session")?.value;
-  const isAuthenticated = cookie
+  const session = cookie
     ? await verifySession(cookie, sessionSecret)
-    : false;
+    : { valid: false, needsReauth: false };
 
   // Protect all API routes
   if (pathname.startsWith("/api/")) {
-    if (!isAuthenticated) {
+    if (!session.valid) {
+      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+    }
+    if (session.needsReauth) {
       return NextResponse.json(
-        { error: "Unauthorized." },
+        { error: "Password re-verification required.", reauth: true },
         { status: 401 },
       );
     }
@@ -74,8 +96,16 @@ export async function middleware(request: NextRequest) {
   }
 
   // Redirect unauthenticated users to login for app pages
-  if (!isAuthenticated) {
+  if (!session.valid) {
     const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("from", pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Redirect to password re-verification if 48h exceeded
+  if (session.needsReauth) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("reauth", "1");
     loginUrl.searchParams.set("from", pathname);
     return NextResponse.redirect(loginUrl);
   }

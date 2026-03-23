@@ -9,7 +9,7 @@ let mainWindow = null;
 let nextProcess = null;
 let splashWin = null;
 
-// ── Helpers: status na splash ──────────────────────────────
+// ── Helpers: splash status text ────────────────────────────
 async function setStatus(text) {
   try {
     if (splashWin && !splashWin.isDestroyed()) {
@@ -31,7 +31,7 @@ async function showSplashError(title, message) {
   await new Promise((r) => setTimeout(r, 5500));
 }
 
-// ── Zabij proces nasłuchujący na porcie 3333 (Windows) ─────
+// ── Kill process listening on port (Windows) ──────────────
 function killProcessOnPort(port) {
   if (process.platform !== "win32") return false;
   try {
@@ -48,18 +48,18 @@ function killProcessOnPort(port) {
     if (!m) return false;
     const pid = m[1];
     execSync(`taskkill /PID ${pid} /F /T`, { stdio: "pipe" });
-    console.log(`[electron] Zabito proces PID ${pid} na porcie ${port}`);
+    console.log(`[electron] Killed process PID ${pid} on port ${port}`);
     return true;
   } catch {
-    console.warn("[electron] Nie udało się zabić procesu na porcie", port);
+    console.warn("[electron] Could not kill process on port", port);
     return false;
   }
 }
 
-// ── Uruchom serwer Next.js na porcie 3333 ──────────────────
+// ── Start Next.js dev server on fixed port ────────────────
 function startNextServer(port) {
   return new Promise((resolve, reject) => {
-    // npx next dev -p <port> – działa na Windows i Linux/Mac
+    // npx next dev -p <port> works on Windows, Linux, and macOS
     nextProcess = spawn("npx", ["next", "dev", "-p", String(port)], {
       cwd: path.join(__dirname, ".."),
       shell: true,
@@ -77,7 +77,7 @@ function startNextServer(port) {
   });
 }
 
-// ── Główne okno aplikacji ──────────────────────────────────
+// ── Main application window ───────────────────────────────
 function createWindow() {
   const icon = nativeImage.createFromPath(
     path.join(__dirname, "../public/favicon.png"),
@@ -116,7 +116,7 @@ function createWindow() {
   });
 }
 
-// ── Lifecycle ──────────────────────────────────────────────
+// ── Lifecycle ─────────────────────────────────────────────
 app.whenReady().then(async () => {
   splashWin = new BrowserWindow({
     width: 360,
@@ -131,20 +131,20 @@ app.whenReady().then(async () => {
   await splashWin.loadFile(path.join(__dirname, "splash.html"));
 
   try {
-    await setStatus("Sprawdzanie portu...");
+    await setStatus("Checking port...");
 
     const killed = killProcessOnPort(PORT);
     if (killed) {
-      await setStatus("Zwolniono port– uruchamianie aplikacji…");
+      await setStatus("Freed the port — starting the app...");
       await new Promise((r) => setTimeout(r, 1000));
     } else {
-      await setStatus("Port wygląda na wolny – uruchamianie aplikacji…");
+      await setStatus("Port looks free — starting the app...");
     }
 
     let elapsed = 0;
     const ticker = setInterval(() => {
       elapsed++;
-      setStatus(`Uruchamianie aplikacji... ${elapsed}s`);
+      setStatus(`Starting the app... ${elapsed}s`);
     }, 1000);
 
     try {
@@ -153,17 +153,17 @@ app.whenReady().then(async () => {
       clearInterval(ticker);
     }
 
-    await setStatus("Gotowe!");
+    await setStatus("Ready!");
     await new Promise((r) => setTimeout(r, 300));
     splashWin.close();
     createWindow();
   } catch (err) {
-    console.error("[electron] Błąd uruchamiania:", err);
+    console.error("[electron] Startup error:", err);
     const msg = err?.message || String(err);
     await showSplashError(
-      "Błąd uruchamiania",
+      "Startup failed",
       msg.includes("timeout") || msg.includes("Timeout")
-        ? "Serwer nie uruchomił się w 120 sekund.\nSprawdź czy Node.js jest zainstalowany\ni uruchom: npm install"
+        ? "The app did not start within 120 seconds.\nCheck that Node.js is installed\nand run: npm install"
         : msg.slice(0, 160),
     );
     app.quit();

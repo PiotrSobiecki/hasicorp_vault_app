@@ -9,14 +9,16 @@ const SK_STORAGE_KEY = "pm_secret_key";
 interface LoginConfig {
   totpRequired: boolean;
   secretKeyRequired: boolean;
+  deviceTrusted: boolean;
 }
 
 export default function LoginPage() {
-  const [config, setConfig] = useState<LoginConfig>({ totpRequired: false, secretKeyRequired: false });
+  const [config, setConfig] = useState<LoginConfig>({ totpRequired: false, secretKeyRequired: false, deviceTrusted: false });
   const [password, setPassword] = useState("");
   const [secretKey, setSecretKey] = useState("");
   const [totpCode, setTotpCode] = useState("");
   const [rememberDevice, setRememberDevice] = useState(true);
+  const [rememberTotp, setRememberTotp] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [skStored, setSkStored] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,6 +27,10 @@ export default function LoginPage() {
   const searchParams = useSearchParams();
   const rawFrom = searchParams.get("from") || "/";
   const from = rawFrom.startsWith("/") && !rawFrom.includes("://") ? rawFrom : "/";
+  const isReauth = searchParams.get("reauth") === "1";
+
+  // TOTP is needed when required by config and device is not already trusted
+  const showTotp = config.totpRequired && !config.deviceTrusted;
 
   // Fetch login config (which factors are required)
   useEffect(() => {
@@ -39,16 +45,17 @@ export default function LoginPage() {
         }
       })
       .catch(() => {});
-  }, []);
+  }, [isReauth]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
     try {
-      const body: Record<string, string> = { password };
+      const body: Record<string, string | boolean> = { password };
       if (config.secretKeyRequired && secretKey) body.secretKey = secretKey;
-      if (config.totpRequired && totpCode) body.totpCode = totpCode;
+      if (showTotp && totpCode) body.totpCode = totpCode;
+      if (showTotp) body.rememberDevice = rememberTotp;
 
       const res = await fetch("/api/login", {
         method: "POST",
@@ -83,7 +90,11 @@ export default function LoginPage() {
           </svg>
         </div>
         <div className="pm-login-title">Vault Manager</div>
-        <div className="pm-login-subtitle">Enter your master password to unlock the vault</div>
+        <div className="pm-login-subtitle">
+          {isReauth
+            ? "Re-enter your master password to continue"
+            : "Enter your master password to unlock the vault"}
+        </div>
       </div>
 
       {/* Card */}
@@ -156,13 +167,13 @@ export default function LoginPage() {
           )}
 
           {/* TOTP */}
-          {config.totpRequired && (
+          {showTotp && (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <label className="pm-form-label" style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
                 </svg>
-                Kod 2FA
+                2FA code
               </label>
               <input
                 type="text"
@@ -175,6 +186,11 @@ export default function LoginPage() {
                 autoComplete="one-time-code"
                 style={{ fontFamily: "monospace", fontSize: 20, letterSpacing: "0.25em", textAlign: "center" }}
               />
+              <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 12, color: "var(--text-muted)" }}>
+                <input type="checkbox" checked={rememberTotp} onChange={(e) => setRememberTotp(e.target.checked)}
+                  style={{ accentColor: "var(--accent)", width: 13, height: 13 }} />
+                Don&apos;t ask for 2FA on this device for 30 days
+              </label>
             </div>
           )}
 
