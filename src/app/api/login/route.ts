@@ -174,7 +174,7 @@ export async function POST(request: NextRequest) {
   logLoginAttempt(ip, true);
   checkRateLimit(`login:${ip}`, 0, 0); // Reset counter on success
 
-  // ── Issue signed session cookie (30 days, issuedAt for 48h reauth) ──
+  // ── Issue signed session cookie (30 days maxAge; issuedAt for periodic password re-auth) ──
   const token = randomBytes(32).toString("hex");
   const issuedAt = Math.floor(Date.now() / 1000);
   const signature = signToken(`${token}.${issuedAt}`, sessionSecret);

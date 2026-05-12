@@ -4,7 +4,8 @@ import type { NextRequest } from "next/server";
 // Public routes that don't require authentication
 const PUBLIC_API_ROUTES = new Set(["/api/login", "/api/logout", "/api/favicon", "/api/login-config"]);
 
-const PASSWORD_REAUTH_SECONDS = 48 * 60 * 60;
+/** After this many seconds since login, user must enter password again (session cookie may still be valid). */
+const PASSWORD_REAUTH_SECONDS = 10 * 24 * 60 * 60;
 
 interface SessionResult {
   valid: boolean;
@@ -47,7 +48,7 @@ async function verifySession(
   }
   if (diff !== 0) return { valid: false, needsReauth: false };
 
-  // Valid signature — check whether password re-verification is needed (48h)
+  // Valid signature — check whether password re-verification is needed
   const now = Math.floor(Date.now() / 1000);
   if (now - issuedAt > PASSWORD_REAUTH_SECONDS) {
     return { valid: true, needsReauth: true };
@@ -102,7 +103,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Redirect to password re-verification if 48h exceeded
+  // Redirect to password re-verification if re-auth window exceeded
   if (session.needsReauth) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("reauth", "1");
