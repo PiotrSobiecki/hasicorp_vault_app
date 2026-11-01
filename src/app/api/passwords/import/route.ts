@@ -1,3 +1,4 @@
+import { requireSession } from "@/lib/session";
 import { NextResponse } from "next/server";
 import {
   createVaultPassword,
@@ -7,6 +8,9 @@ import {
 } from "@/lib/vault";
 
 export async function POST(request: Request) {
+  const denied = requireSession(request);
+  if (denied) return denied;
+
   try {
     const { passwords } = await request.json();
 

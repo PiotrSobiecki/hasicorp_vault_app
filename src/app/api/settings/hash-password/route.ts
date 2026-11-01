@@ -1,3 +1,4 @@
+import { requireSession } from "@/lib/session";
 import { NextResponse } from "next/server";
 import { hash as argon2Hash } from "argon2";
 
@@ -7,6 +8,9 @@ import { hash as argon2Hash } from "argon2";
  * Protected by session middleware — only authenticated users can call this.
  */
 export async function POST(request: Request) {
+  const denied = requireSession(request);
+  if (denied) return denied;
+
   const body = await request.json().catch(() => ({}));
   const password = body.password as string | undefined;
 

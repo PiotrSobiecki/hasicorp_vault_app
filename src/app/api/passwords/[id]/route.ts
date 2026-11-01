@@ -1,3 +1,4 @@
+import { requireSession } from "@/lib/session";
 import { NextResponse } from "next/server";
 import {
   deleteVaultPassword,
@@ -9,6 +10,9 @@ import { validatePasswordInput } from "@/lib/validation";
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function DELETE(_request: Request, { params }: RouteContext) {
+  const denied = requireSession(_request);
+  if (denied) return denied;
+
   try {
     const { id } = await params;
     await deleteVaultPassword(id);
@@ -26,6 +30,9 @@ export async function DELETE(_request: Request, { params }: RouteContext) {
 }
 
 export async function GET(_request: Request, { params }: RouteContext) {
+  const denied = requireSession(_request);
+  if (denied) return denied;
+
   try {
     const { id } = await params;
     const password = await getVaultPassword(id);
@@ -51,6 +58,9 @@ export async function GET(_request: Request, { params }: RouteContext) {
 }
 
 export async function PUT(request: Request, { params }: RouteContext) {
+  const denied = requireSession(request);
+  if (denied) return denied;
+
   try {
     const { id } = await params;
     const body = await request.json().catch(() => null);
