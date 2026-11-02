@@ -1,8 +1,12 @@
+import { requireSession } from "@/lib/session";
 import { NextResponse } from "next/server";
 import { createVaultPassword, listVaultPasswords } from "@/lib/vault";
 import { validatePasswordInput } from "@/lib/validation";
 
 export async function POST(request: Request) {
+  const denied = requireSession(request);
+  if (denied) return denied;
+
   try {
     const body = await request.json().catch(() => null);
     const validation = validatePasswordInput(body);
@@ -25,7 +29,10 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const denied = requireSession(request);
+  if (denied) return denied;
+
   try {
     const passwords = await listVaultPasswords();
     return NextResponse.json(passwords ?? []);

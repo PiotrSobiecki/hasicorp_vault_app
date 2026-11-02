@@ -1,3 +1,4 @@
+import { requireSession } from "@/lib/session";
 import { NextResponse } from "next/server";
 import { authenticator } from "otplib";
 import { getAppConfig } from "@/lib/vault";
@@ -7,7 +8,10 @@ import { getAppConfig } from "@/lib/vault";
  * the QR code in their Security Kit PDF or re-scan it.
  * Protected by session middleware — never public.
  */
-export async function GET() {
+export async function GET(request: Request) {
+  const denied = requireSession(request);
+  if (denied) return denied;
+
   const config = await getAppConfig();
 
   if (!config.totpEnabled || !config.totpSecret) {

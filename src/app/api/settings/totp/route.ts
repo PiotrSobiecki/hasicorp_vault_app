@@ -1,9 +1,13 @@
+import { requireSession } from "@/lib/session";
 import { NextResponse } from "next/server";
 import { authenticator } from "otplib";
 import { getAppConfig, saveAppConfig } from "@/lib/vault";
 
 /** GET — current TOTP status (enabled/disabled, no secret exposed) */
-export async function GET() {
+export async function GET(request: Request) {
+  const denied = requireSession(request);
+  if (denied) return denied;
+
   const config = await getAppConfig();
   return NextResponse.json({ enabled: config.totpEnabled === true });
 }
@@ -14,6 +18,9 @@ export async function GET() {
  *   { action: "verify", secret, code }  → verifies code, saves to Vault, enables TOTP
  */
 export async function POST(request: Request) {
+  const denied = requireSession(request);
+  if (denied) return denied;
+
   const body = await request.json().catch(() => ({}));
 
   if (body.action === "generate") {
@@ -40,6 +47,9 @@ export async function POST(request: Request) {
 
 /** DELETE — disable TOTP (requires current code for confirmation) */
 export async function DELETE(request: Request) {
+  const denied = requireSession(request);
+  if (denied) return denied;
+
   const body = await request.json().catch(() => ({}));
   const config = await getAppConfig();
 

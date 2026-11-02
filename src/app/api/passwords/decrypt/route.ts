@@ -1,7 +1,11 @@
+import { requireSession } from "@/lib/session";
 import { NextResponse } from "next/server";
 import { decrypt } from "@/lib/encryption";
 
 export async function POST(request: Request) {
+  const denied = requireSession(request);
+  if (denied) return denied;
+
   try {
     const { encryptedData } = await request.json();
 
